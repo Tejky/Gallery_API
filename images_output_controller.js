@@ -8,9 +8,11 @@ const webp = require("webp-converter");
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+const utility = require("./utility.js");
+
 //display image file
 app.get("/images/:resolution/:path(*)", (req, res) => {
-  const originalImage = `Galleries/${req.params.path}`;
+  const originalImage = `${utility.galPath}/${req.params.path}`;
   fs.stat(originalImage, (err, stats) => {
     if (err === null) {
       let [width, height] = req.params.resolution.split("x");

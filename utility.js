@@ -3,10 +3,53 @@ const app = express();
 const fs = require("fs");
 const path = require("path");
 
-var imageData = require("./images.json");
+const galPath = "Galleries";
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+const getGalleries = () => {
+  return new Promise((resolve, reject) => {
+    fs.readdir(galPath, async (err, folders) => {
+      if (err) {
+        reject(new Error(err));
+      }
+      var promiseArray = [];
+      folders.forEach((folder) => {
+        promiseArray.push(
+          new Promise((resolve, reject) =>
+            fs.readdir(`${galPath}/${folder}`, async (err, files) => {
+              if (err) {
+                reject(err);
+              }
+              if (files.length !== 0) {
+                resolve({
+                  path: encodeURI(folder),
+                  name: folder,
+                  image: {
+                    path: encodeURI(files[0]),
+                    fullpath: `${encodeURI(folder)}/${encodeURI(files[0])}`,
+                    name: files[0],
+                    modified: await getModifiedTime(
+                      `${galPath}/${folder}/${files[0]}`
+                    ),
+                  },
+                });
+              } else {
+                resolve({
+                  path: encodeURI(folder),
+                  name: folder,
+                });
+              }
+            })
+          )
+        );
+      });
+      var results = await Promise.all(promiseArray);
+      resolve(results);
+    });
+  });
+};
 
 const getModifiedTime = (newPath) => {
   return new Promise((resolve) => {
@@ -22,104 +65,56 @@ const getModifiedTime = (newPath) => {
 };
 
 const saveFile = async (req, res, newPath) => {
-  var image = { uploaded: {} };
+  var image = [];
   let imageName = path.basename(newPath, path.extname(newPath));
   imageName = `${imageName[0].toUpperCase()}${imageName.substring(1)}`;
   try {
     fs.writeFileSync(newPath, req.file.buffer, (err) => {
       if (err) {
+        console.log(err);
       } else {
         console.log("The file was saved");
       }
     });
-    image.uploaded = {
-      path: path.basename(newPath),
-      fullpath: `${encodeURI(req.params.path)}/${path.basename(newPath)}`,
+    image.push({
+      path: encodeURI(path.basename(newPath)),
+      fullpath: `${encodeURI(req.params.path)}/${encodeURI(
+        path.basename(newPath)
+      )}`,
       name: imageName,
       modified: await getModifiedTime(newPath),
-    };
+    });
   } catch {
     return res.status(404).json({ msg: "Gallery not found" });
   }
-  imageData.galleries.forEach((gallery) => {
-    if (gallery.name === req.params.path) {
-      if (gallery.images != undefined) {
-        gallery.images.push(image.uploaded);
-      } else {
-        gallery.images = [image.uploaded];
-      }
-    }
-  });
-  fs.writeFileSync("images.json", JSON.stringify(imageData), (err) => {
-    if (err) {
-      return res.status(500).json({ error: "An error has occured" });
-    }
-  });
-
-  return res.status(201).json({ uploaded: image.uploaded });
+  return res.status(201).json({ uploaded: image });
 };
 
-const deleteFile = (req, res, dirPath) => {
-  fs.stat(dirPath, (err, stats) => {
+const deleteFile = (res, filePath) => {
+  fs.stat(filePath, (err, stats) => {
     if (stats.isDirectory()) {
-      fs.rmdir(dirPath, { recursive: true }, (err) => {
-        if (err) {
-          throw err;
-        }
+      fs.rmdir(filePath, { recursive: true }, () => {
         return res.status(200).json({ msg: "Gallery was deleted" });
       });
-      deleteGalleryJSON(req);
     } else {
-      fs.unlink(dirPath, (err) => {
-        if (err) {
-          throw err;
-        }
+      fs.unlink(filePath, () => {
         return res.status(200).json({ msg: "Photo was deleted" });
       });
-      deleteImageJSON(req);
     }
   });
 };
 
-const checkDirExist = (req, res, dirPath) => {
+const checkFileExist = (res, filePath) => {
   try {
-    fs.accessSync(dirPath, () => {});
-    deleteFile(req, res, dirPath);
+    fs.accessSync(filePath, () => {});
+    deleteFile(res, filePath);
   } catch {
     return res.status(404).json({ msg: "Gallery/photo does not exist" });
   }
 };
 
-const deleteGalleryJSON = (req) => {
-  const data = imageData.galleries.filter(
-    (item) => item.name != req.params.path
-  );
-  fs.writeFileSync(
-    "images.json",
-    JSON.stringify({ galleries: data }),
-    (err) => {}
-  );
-};
-
-const deleteImageJSON = (req) => {
-  const data = { galleries: [] };
-  imageData.galleries.forEach((gallery) => {
-    if (gallery.name != path.dirname(req.params.path)) {
-      data.galleries.push(gallery);
-    } else {
-      data.galleries.push({
-        name: gallery.name,
-        path: gallery.path,
-        images: gallery.images.filter(
-          (item) => item.fullpath != encodeURI(req.params.path)
-        ),
-      });
-    }
-  });
-  fs.writeFileSync("images.json", JSON.stringify(data), (err) => {
-    if (err) throw err;
-  });
-};
-
 module.exports.saveFile = saveFile;
-module.exports.checkDirExist = checkDirExist;
+module.exports.getGalleries = getGalleries;
+module.exports.getModifiedTime = getModifiedTime;
+module.exports.checkFileExist = checkFileExist;
+module.exports.galPath = galPath;
