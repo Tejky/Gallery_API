@@ -1,8 +1,12 @@
 const express = require("express");
 const app = express();
+const fs = require("fs");
+const utility = require("./utility.js");
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+fs.mkdir(utility.galPath, () => {});
 
 const gallery = require("./gallery_controller.js");
 const gallery_images = require("./gallery_images_controller.js");
