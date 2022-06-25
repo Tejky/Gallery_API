@@ -106,7 +106,7 @@ const deleteFile = (res, filePath) => {
 
 const checkFileExist = (res, filePath) => {
   try {
-    fs.accessSync(filePath, () => {});
+    fs.accessSync(filePath);
     deleteFile(res, filePath);
   } catch {
     return res.status(404).json({ msg: "Gallery/photo does not exist" });

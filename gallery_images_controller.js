@@ -16,9 +16,8 @@ app.get("/gallery/:path(*)", (req, res) => {
     name: req.params.path,
     images: [],
   };
-
   try {
-    fs.accessSync(`${utility.galPath}/${req.params.path}`, () => {});
+    fs.accessSync(`${utility.galPath}/${req.params.path}`);
   } catch {
     return res.status(404).json({ msg: "Gallery does not exist" });
   }
